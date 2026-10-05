@@ -4,10 +4,22 @@ Protótipo de simulação educacional em terminal, com dois modos iniciais: voo 
 
 ## Executar
 
-Requer Elixir 1.20 e Erlang/OTP 29. Não há dependências externas neste protótipo.
+Requer Elixir 1.20 e Erlang/OTP 29. A interface também requer Rust/Cargo. O motor usa Jason para o protocolo JSON.
+
+Para jogar na interface Ratatui:
+
+```sh
+cd frontend
+cargo run
+```
+
+O cliente prepara as dependências Elixir e compila o motor automaticamente antes de abrir o terminal. Pressione `1` ou `2` para escolher o modo, `F1` para ajuda e `Ctrl+C` para sair. Veja os [controles completos](frontend/README.md).
+
+Para usar o console Elixir diretamente:
 
 ```sh
 cd engine
+mix deps.get
 mix test
 mix run -e 'Engine.CLI.main(System.argv())' -- space
 mix run -e 'Engine.CLI.main(System.argv())' -- central
@@ -17,7 +29,7 @@ No modo espacial, use `check`, `launch` e `wait 100`. Na central, use `assign or
 
 ## Estado do projeto
 
-Este é um **protótipo de motor e console**, não a V1 definida em [SPEC.md](SPEC.md). Já há dois cenários completos, semente, eventos, observações e cálculos básicos. Faltam campanha e tutoriais, conteúdo progressivo, persistência SQLite, protocolo JSON, cliente Rust/Ratatui, acessibilidade, validação científica mais ampla e distribuição. Os modelos e limites atuais estão em [docs/MODELS.md](docs/MODELS.md).
+Este é um **protótipo de motor, protocolo e TUI**, não a V1 definida em [SPEC.md](SPEC.md). Já há dois cenários introdutórios, semente, eventos, observações, cálculos básicos e interface por teclado. Faltam campanhas e tutoriais, conteúdo progressivo, persistência SQLite, recuperação de partidas, validação científica mais ampla e distribuição. Os modelos e limites atuais estão em [docs/MODELS.md](docs/MODELS.md).
 
 ## Estrutura
 
@@ -27,9 +39,11 @@ Este é um **protótipo de motor e console**, não a V1 definida em [SPEC.md](SP
 - `engine/lib/engine/calculator.ex`: dois cálculos com unidade e hipótese.
 - `engine/lib/engine/cli.ex`: console para experimentar os cenários.
 - `engine/test/simulation_test.exs`: reprodução, decisões e limites básicos.
+- `protocol/README.md`: contrato JSONL local entre motor e interface.
+- `frontend/`: cliente Rust/Ratatui com ajuda, instrumentos, eventos e calculadora.
 
 ## Próximas etapas
 
 1. Fechar contrato de produto e modelos de referência de ambas as campanhas.
 2. Criar catálogo versionado, tutorial e mais de um cenário por modo.
-3. Implementar persistência, protocolo e TUI Ratatui conforme a especificação.
+3. Implementar persistência e retomada de partidas, ampliar o protocolo e evoluir a TUI conforme a especificação.
