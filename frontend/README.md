@@ -13,4 +13,6 @@ Na abertura, pressione `1` para o programa espacial ou `2` para a central fictí
 
 Comandos do programa espacial: `check`, `launch`, `abort`, `wait N`. Comandos da central: `assign orion`, `assign vega`, `recall orion`, `recall vega`, `wait N`. `N` vai de 1 a 500. `snapshot` sincroniza os instrumentos. A calculadora usa `calc speed DISTÂNCIA_M TEMPO_S` ou `calc eta TRABALHO_RESTANTE EQUIPES`.
 
-A TUI usa o contrato em [`../protocol/README.md`](../protocol/README.md). A simulação atual é um protótipo: não salva partidas, não inclui campanhas e não mantém estado ao fechar o cliente.
+`tech` mostra pontos de pesquisa e a árvore inicial. Uma conclusão inédita para a combinação de modo e semente concede dois pontos em caso de sucesso ou um em caso de conclusão parcial. `research filter` compra a primeira melhoria por dois pontos; ela afeta as próximas missões. Use `space 43` ou `central 43` para iniciar outra semente. O perfil é salvo localmente em `~/.local/share/terminal-launch-sim/profile.json`, respeitando `XDG_DATA_HOME` e `TLS_PROFILE_PATH`.
+
+A TUI usa o contrato em [`../protocol/README.md`](../protocol/README.md). A simulação atual é um protótipo: salva o perfil de pesquisa, mas não salva nem retoma partidas ao fechar o cliente.

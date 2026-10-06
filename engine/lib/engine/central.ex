@@ -105,7 +105,7 @@ defmodule Engine.Central do
        | contacts: contacts,
          available_teams: state.available_teams + freed,
          status: status,
-         signal_jitter_s: floor(sample * 3) - 1
+         signal_jitter_s: if(state.tech_level >= 1, do: 0, else: floor(sample * 3) - 1)
      }, events}
   end
 
@@ -116,7 +116,8 @@ defmodule Engine.Central do
       time_s: state.time_s,
       status: state.status,
       available_teams: state.available_teams,
-      deadline_uncertainty_s: 1,
+      deadline_uncertainty_s: if(state.tech_level >= 1, do: 0, else: 1),
+      tech_level: state.tech_level,
       contacts:
         Enum.map(state.contacts, fn contact ->
           contact

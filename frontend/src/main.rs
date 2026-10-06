@@ -45,6 +45,7 @@ enum Panel {
     Mission,
     Telemetry,
     Log,
+    Research,
 }
 
 impl Panel {
@@ -52,7 +53,8 @@ impl Panel {
         match self {
             Self::Mission => Self::Telemetry,
             Self::Telemetry => Self::Log,
-            Self::Log => Self::Mission,
+            Self::Log => Self::Research,
+            Self::Research => Self::Mission,
         }
     }
     fn name(self) -> &'static str {
@@ -60,6 +62,7 @@ impl Panel {
             Self::Mission => "MISSÃO",
             Self::Telemetry => "TELEMETRIA",
             Self::Log => "EVENTOS",
+            Self::Research => "PESQUISA",
         }
     }
 }
@@ -67,6 +70,7 @@ impl Panel {
 struct App {
     engine: EngineClient,
     snapshot: Option<Value>,
+    profile: Option<Value>,
     run_id: Option<String>,
     seq: u64,
     mode: Option<String>,
@@ -88,9 +92,14 @@ impl App {
             ),
             Err(e) => format!("Falha de catálogo: {e}"),
         };
+        let profile = engine
+            .request("tech.status", None, 0, json!({}))
+            .ok()
+            .map(|data| data["profile"].clone());
         Self {
             engine,
             snapshot: None,
+            profile,
             run_id: None,
             seq: 0,
             mode: None,
@@ -104,16 +113,16 @@ impl App {
         }
     }
 
-    fn start(&mut self, mode: &str) {
+    fn start(&mut self, mode: &str, seed: u64) {
         match self
             .engine
-            .request("run.create", None, 0, json!({"mode": mode, "seed": 42}))
+            .request("run.create", None, 0, json!({"mode": mode, "seed": seed}))
         {
             Ok(data) => {
                 self.mode = Some(mode.into());
                 self.logs.clear();
                 self.accept_snapshot(&data);
-                self.status = format!("Missão iniciada: {} · semente 42", mode_title(mode));
+                self.status = format!("Missão iniciada: {} · semente {seed}", mode_title(mode));
             }
             Err(e) => self.status = e,
         }
@@ -153,6 +162,31 @@ impl App {
         }
     }
 
+    fn refresh_profile(&mut self) {
+        match self.engine.request("tech.status", None, 0, json!({})) {
+            Ok(data) => {
+                self.profile = Some(data["profile"].clone());
+                self.panel = Panel::Research;
+                self.status = "Pesquisa sincronizada".into();
+            }
+            Err(e) => self.status = e,
+        }
+    }
+
+    fn unlock_filter(&mut self) {
+        match self
+            .engine
+            .request("tech.unlock", None, 0, json!({"id": "filter"}))
+        {
+            Ok(data) => {
+                self.profile = Some(data["profile"].clone());
+                self.panel = Panel::Research;
+                self.status = "Bancada desbloqueada; efeito nas próximas missões".into();
+            }
+            Err(e) => self.status = e,
+        }
+    }
+
     fn submit(&mut self) {
         let command = self.input.trim().to_lowercase();
         self.input.clear();
@@ -171,8 +205,26 @@ impl App {
             self.refresh();
             return;
         }
-        if command == "space" || command == "central" {
-            self.start(&command);
+        if command == "tech" || command == "pesquisa" {
+            self.refresh_profile();
+            return;
+        }
+        if command == "research filter" || command == "pesquisar filtro" {
+            self.unlock_filter();
+            return;
+        }
+        let parts: Vec<&str> = command.split_whitespace().collect();
+        if matches!(parts.first(), Some(&"space" | &"central")) && parts.len() <= 2 {
+            let seed = if parts.len() == 1 {
+                Some(42)
+            } else {
+                parts[1].parse::<u64>().ok()
+            };
+            if let Some(seed) = seed {
+                self.start(parts[0], seed);
+            } else {
+                self.status = "Uso: space [SEMENTE] | central [SEMENTE]".into();
+            }
             return;
         }
         if command.starts_with("calc ") {
@@ -193,7 +245,17 @@ impl App {
         ) {
             Ok(data) => {
                 self.accept_snapshot(&data);
-                self.status = format!("Comando aceito · sequência {}", self.seq);
+                let earned = data["research_points_earned"].as_u64().unwrap_or(0);
+                if earned > 0 {
+                    self.profile = self
+                        .engine
+                        .request("tech.status", None, 0, json!({}))
+                        .ok()
+                        .map(|reply| reply["profile"].clone());
+                    self.status = format!("Missão concluída · +{earned} ponto(s) de pesquisa");
+                } else {
+                    self.status = format!("Comando aceito · sequência {}", self.seq);
+                }
             }
             Err(e) => {
                 self.logs.push(format!("REJEITADO: {e}"));
@@ -280,10 +342,10 @@ impl App {
                 self.input.pop();
             }
             KeyCode::Char('1') if self.mode.is_none() && self.input.is_empty() => {
-                self.start("space")
+                self.start("space", 42)
             }
             KeyCode::Char('2') if self.mode.is_none() && self.input.is_empty() => {
-                self.start("central")
+                self.start("central", 42)
             }
             KeyCode::Char(c) if !self.help => self.input.push(c),
             _ => {}
@@ -401,7 +463,11 @@ fn mission_lines(o: &Value) -> Vec<String> {
                 format_number(&o["target_altitude_m"]),
                 o["phase"].as_str().unwrap_or("?")
             ),
-            "OBSERVAÇÃO: altitude ±5 m; modelo 1D".into(),
+            format!(
+                "OBSERVAÇÃO: altitude ±{} m; tecnologia nível {}",
+                format_number(&o["altitude_uncertainty_m"]),
+                format_number(&o["tech_level"])
+            ),
         ]
     } else {
         let mut lines = vec![
@@ -425,10 +491,42 @@ fn mission_lines(o: &Value) -> Vec<String> {
                 "EQUIPES DISPONÍVEIS: {}",
                 format_number(&o["available_teams"])
             ),
-            "PRAZOS ESTIMADOS: ±1 s".into(),
+            format!(
+                "PRAZOS ESTIMADOS: ±{} s · tecnologia nível {}",
+                format_number(&o["deadline_uncertainty_s"]),
+                format_number(&o["tech_level"])
+            ),
         ]);
         lines
     }
+}
+
+fn research_lines(profile: Option<&Value>) -> Vec<String> {
+    let Some(profile) = profile else {
+        return vec!["Perfil de pesquisa indisponível".into()];
+    };
+    let unlocked = profile["next_unlock"]["unlocked"] == true;
+    vec![
+        "      LABORATÓRIO DE COMPUTAÇÃO".into(),
+        String::new(),
+        format!("PONTOS DISPONÍVEIS: {}", format_number(&profile["points"])),
+        format!("NÍVEL TECNOLÓGICO: {}", format_number(&profile["tier"])),
+        String::new(),
+        format!(
+            "[{}] BANCADA DE FILTRAGEM · custo {} ponto(s)",
+            if unlocked { "X" } else { " " },
+            format_number(&profile["next_unlock"]["cost"])
+        ),
+        "Efeito: altitude ±5 m → ±3 m; prazo ±1 s → 0 s".into(),
+        if unlocked {
+            "Ativa nas novas missões".into()
+        } else {
+            "Desbloqueie com: research filter".into()
+        },
+        String::new(),
+        "PRÓXIMAS ETAPAS: rede de sensores, IA e supercomputação".into(),
+        "Essas etapas ainda estão em desenvolvimento.".into(),
+    ]
 }
 
 fn render_lines(
@@ -492,6 +590,7 @@ fn draw(frame: &mut ratatui::Frame, app: &App) {
                         app.logs.iter().rev().cloned().collect()
                     }
                 }
+                Panel::Research => research_lines(app.profile.as_ref()),
             };
             render_lines(
                 frame,
@@ -505,11 +604,20 @@ fn draw(frame: &mut ratatui::Frame, app: &App) {
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Percentage(52), Constraint::Percentage(48)])
                 .split(rows[1]);
+            let research = matches!(app.panel, Panel::Research);
             render_lines(
                 frame,
                 sections[0],
-                "VISÃO DA MISSÃO",
-                mission_lines(o),
+                if research {
+                    "PESQUISA"
+                } else {
+                    "VISÃO DA MISSÃO"
+                },
+                if research {
+                    research_lines(app.profile.as_ref())
+                } else {
+                    mission_lines(o)
+                },
                 color,
             );
             let columns = Layout::default()
@@ -534,14 +642,22 @@ fn draw(frame: &mut ratatui::Frame, app: &App) {
         render_lines(
             frame,
             rows[1],
-            "INICIAR",
-            vec![
-                "".into(),
-                "  [1] PROGRAMA ESPACIAL    Foguete de pesquisa".into(),
-                "  [2] CENTRAL FICTÍCIA     Coordenação de sinais".into(),
-                "".into(),
-                "  Enter envia comandos; F1 abre ajuda; Ctrl+C sai.".into(),
-            ],
+            if matches!(app.panel, Panel::Research) {
+                "PESQUISA"
+            } else {
+                "INICIAR"
+            },
+            if matches!(app.panel, Panel::Research) {
+                research_lines(app.profile.as_ref())
+            } else {
+                vec![
+                    "".into(),
+                    "  [1] PROGRAMA ESPACIAL    Foguete de pesquisa".into(),
+                    "  [2] CENTRAL FICTÍCIA     Coordenação de sinais".into(),
+                    "".into(),
+                    "  Enter envia comandos; F1 abre ajuda; Ctrl+C sai.".into(),
+                ]
+            },
             color,
         );
     }
@@ -592,8 +708,10 @@ fn draw(frame: &mut ratatui::Frame, app: &App) {
             "".into(),
             format!("COMANDOS: {commands}"),
             "  wait N: avança 1 a 500 segundos simulados".into(),
-            "  space | central: inicia novo exercício".into(),
+            "  space [SEMENTE] | central [SEMENTE]".into(),
             "  snapshot: sincroniza instrumentos".into(),
+            "  tech: pesquisa e pontos disponíveis".into(),
+            "  research filter: compra a bancada".into(),
             "  calc speed DISTÂNCIA_M TEMPO_S".into(),
             "  calc eta TRABALHO_RESTANTE EQUIPES".into(),
             "".into(),

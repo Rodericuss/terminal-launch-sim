@@ -23,6 +23,8 @@ Capturas da TUI em execução, geradas em um terminal de 106 × 32 caracteres:
 | --- | --- |
 | ![Missão espacial com foguete ASCII, telemetria e eventos](docs/screenshots/space.png) | ![Central fictícia com dois contatos, equipes e prazos estimados](docs/screenshots/central.png) |
 
+![Laboratório de pesquisa após desbloquear a bancada de filtragem](docs/screenshots/research.png)
+
 As imagens podem ser atualizadas com `cargo build --manifest-path frontend/Cargo.toml` e `python scripts/capture_screens.py`. O script de captura requer Pillow, pyte e uma fonte monoespaçada acessível por `fc-match`; essas ferramentas não são necessárias para jogar.
 
 Para usar o console Elixir diretamente:
@@ -37,9 +39,11 @@ mix run -e 'Engine.CLI.main(System.argv())' -- central
 
 No modo espacial, use `check`, `launch` e `wait 100`. Na central, use `assign orion`, `assign vega` e `wait 10`. `help` lista os comandos e `quit` sai. Cada comando avança um segundo; `wait N` avança até N segundos ou o fim da missão. A interface mostra somente o estado observável; o estado interno fica disponível para testes e replay.
 
+Na TUI, conclua a missão da central para receber dois pontos de pesquisa. Digite `tech` para ver o laboratório, `research filter` para desbloquear a bancada e `central 43` ou `space 43` para iniciar uma missão com a nova semente e instrumentos calibrados. O perfil fica salvo em `~/.local/share/terminal-launch-sim/profile.json` ou no caminho de `TLS_PROFILE_PATH`.
+
 ## Estado do projeto
 
-Este é um **protótipo de motor, protocolo e TUI**, não a V1 definida em [SPEC.md](SPEC.md). Já há dois cenários introdutórios, semente, eventos, observações, cálculos básicos e interface por teclado. Faltam campanhas e tutoriais, conteúdo progressivo, persistência SQLite, recuperação de partidas, validação científica mais ampla e distribuição. Os modelos e limites atuais estão em [docs/MODELS.md](docs/MODELS.md). A proposta de evolução computacional inspirada nos anos 1990 está em [docs/PROGRESSION.md](docs/PROGRESSION.md); ela ainda não está implementada no protótipo.
+Este é um **protótipo de motor, protocolo e TUI**, não a V1 definida em [SPEC.md](SPEC.md). Já há dois cenários introdutórios, semente, eventos, observações, cálculos básicos, interface por teclado e o primeiro desbloqueio de pesquisa. Faltam campanhas e tutoriais, as etapas de rede de sensores, IA e supercomputação, persistência SQLite de partidas, recuperação de partidas, validação científica mais ampla e distribuição. O perfil de pesquisa usa JSON local nesta etapa. Os modelos e limites atuais estão em [docs/MODELS.md](docs/MODELS.md), e a árvore planejada em [docs/PROGRESSION.md](docs/PROGRESSION.md).
 
 ## Estrutura
 

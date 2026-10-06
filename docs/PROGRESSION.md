@@ -1,6 +1,6 @@
 # Progressão computacional retrofuturista
 
-**Estado:** proposta de design para implementação. O protótipo atual ainda não salva progresso nem aplica esta árvore. O universo usa a linguagem visual e as ideias precursoras dos anos 1990, mas acelera deliberadamente a evolução do poder computacional. A linha do tempo é fictícia.
+**Estado:** primeiro desbloqueio jogável; demais etapas em planejamento. O protótipo salva pontos e a bancada de filtragem em um perfil JSON local. O universo usa a linguagem visual e as ideias precursoras dos anos 1990, mas acelera deliberadamente a evolução do poder computacional. A linha do tempo é fictícia.
 
 ## Ciclo de jogo
 
@@ -10,7 +10,7 @@
 4. Investir pontos, capacidade elétrica e manutenção em uma tecnologia. O desbloqueio fica no perfil da campanha e abre instrumentos ou análises para as missões seguintes.
 5. Reexecutar cenários com a mesma semente e modelo para comparar o efeito da tecnologia sobre a informação disponível, sem mudar as leis do cenário.
 
-O custo e a produção de pontos ainda precisam de balanceamento. A progressão não depende de esperar tempo real nem de compras externas. Modo prática permite experimentar equipamentos sem alterar o perfil; modo avaliação usa o perfil salvo.
+Nesta versão, uma missão concluída com sucesso concede dois pontos; uma conclusão parcial concede um. A mesma combinação de modo e semente só pontua uma vez, mesmo depois de reiniciar o cliente. A bancada custa dois pontos e só afeta missões criadas depois da compra. Os custos e a produção de pontos ainda precisam de balanceamento. A progressão não depende de esperar tempo real nem de compras externas. Modo prática e modo avaliação ainda não foram implementados.
 
 ## Árvore proposta
 
@@ -31,6 +31,8 @@ As etapas representam **capacidades de jogo**, não uma cronologia técnica lite
 
 Cada melhoria precisa aparecer no catálogo de modelos com versão, entradas, unidade, hipótese, custo e teste de referência. Replay registra perfil tecnológico e versão da árvore no início da partida. Uma alteração de tecnologia durante uma missão só ocorre se a regra do cenário permitir e fica registrada como comando. Relatórios mostram quais decisões vieram do jogador e quais análises foram oferecidas pelo sistema.
 
-## Primeiro incremento implementável
+## Primeiro incremento implementado
 
-Criar um perfil persistente com pontos de pesquisa e etapa desbloqueada. Após uma missão concluída, conceder pontos uma única vez pelo `run_id`, usando critérios verificáveis no relatório. Implementar primeiro a **bancada de filtragem**: um comando de calibração usa amostras e reduz a faixa de incerteza da altitude observada na missão espacial; na central, reduz a incerteza do prazo estimado. A leitura verdadeira e a regra de vitória ficam iguais. Testar antes/depois com a mesma semente e replay do perfil.
+O perfil persistente registra pontos, nível desbloqueado, próximo ID de partida e combinações de modo/semente já recompensadas. O protocolo concede pontos ao fechar uma missão e recusa recompensa duplicada. `tech.status` mostra o perfil; `tech.unlock` compra a **bancada de filtragem**. Ela reduz o erro de altitude de ±5 m para ±3 m no modo espacial e elimina o jitter de ±1 s na estimativa de prazo da central. A leitura verdadeira e a regra de vitória ficam iguais. Os testes comparam a mesma semente antes e depois da melhoria.
+
+O perfil usa JSON atômico em `~/.local/share/terminal-launch-sim/profile.json` (ou `XDG_DATA_HOME`/`TLS_PROFILE_PATH`) enquanto o projeto ainda não tem a persistência SQLite especificada para V1. Partidas não são retomadas após reinício. Rede de sensores, apoio à decisão e supercomputação continuam metas da árvore, ainda sem efeito jogável.

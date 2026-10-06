@@ -52,7 +52,7 @@ defmodule Engine.Space do
     fuel = state.fuel_kg - used
     phase = if fuel <= 0 and state.phase == :powered, do: :coast, else: state.phase
     {noisy, sample} = Engine.random(state)
-    observed = round(altitude + (sample * 2.0 - 1.0) * 5.0)
+    observed = round(altitude + (sample * 2.0 - 1.0) * uncertainty(state))
 
     next = %{
       noisy
@@ -91,9 +91,13 @@ defmodule Engine.Space do
       velocity_m_s: state.observed_velocity_m_s,
       fuel_kg: Float.round(state.fuel_kg, 2),
       peak_altitude_m: round(state.peak_altitude_m),
-      altitude_uncertainty_m: 5,
+      altitude_uncertainty_m: uncertainty(state),
+      tech_level: state.tech_level,
       target_altitude_m: @target_altitude,
       check_complete: state.check_complete
     }
   end
+
+  defp uncertainty(%{tech_level: 1}), do: 3
+  defp uncertainty(_), do: 5
 end

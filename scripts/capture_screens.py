@@ -12,6 +12,7 @@ import select
 import struct
 import subprocess
 import termios
+import tempfile
 import time
 
 import pyte
@@ -41,10 +42,12 @@ def drain(master, stream, seconds):
 def capture(mode, commands, destination):
     master, slave = os.openpty()
     fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
+    profile_dir = tempfile.TemporaryDirectory(prefix="tls-screenshot-")
     process = subprocess.Popen(
         [str(BIN)],
         cwd=ROOT / "frontend",
-        env={**os.environ, "TERM": "xterm-256color"},
+        env={**os.environ, "TERM": "xterm-256color",
+             "TLS_PROFILE_PATH": str(Path(profile_dir.name) / "profile.json")},
         stdin=slave,
         stdout=slave,
         stderr=slave,
@@ -69,6 +72,7 @@ def capture(mode, commands, destination):
             process.kill()
             process.wait()
         os.close(master)
+        profile_dir.cleanup()
 
 
 def draw(screen, destination):
@@ -116,4 +120,6 @@ if __name__ == "__main__":
         raise SystemExit("Build frontend first: cargo build --manifest-path frontend/Cargo.toml")
     capture("1", ["check", "launch", "wait 30"], OUT / "space.png")
     capture("2", ["assign orion", "assign vega", "wait 3"], OUT / "central.png")
-    print("Captured docs/screenshots/space.png and central.png")
+    capture("2", ["assign orion", "assign vega", "wait 10", "research filter", "central 43", "tech"],
+            OUT / "research.png")
+    print("Captured space.png, central.png and research.png")

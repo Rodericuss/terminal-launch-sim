@@ -7,7 +7,14 @@ defmodule Engine.Protocol do
   @type session :: %{state: map()}
 
   def main(_args) do
-    loop(%{runs: %{}, next_run: 1, responses: %{}})
+    case Engine.ProgressionStore.load() do
+      {:ok, profile} ->
+        loop(new_server(profile))
+
+      {:error, reason} ->
+        IO.puts(:stderr, "Unable to load campaign profile: #{inspect(reason)}")
+        System.halt(1)
+    end
   end
 
   defp loop(server) do
@@ -17,8 +24,32 @@ defmodule Engine.Protocol do
 
       line ->
         {reply, next} = handle_line(line, server)
-        IO.puts(Jason.encode!(reply))
-        loop(next)
+
+        if next.profile != server.profile do
+          case Engine.ProgressionStore.save(next.profile) do
+            :ok ->
+              IO.puts(Jason.encode!(reply))
+              loop(next)
+
+            {:error, reason} ->
+              IO.puts(:stderr, "Unable to save campaign profile: #{inspect(reason)}")
+
+              failed =
+                error(
+                  reply.request_id,
+                  reply.run_id,
+                  reply.seq,
+                  "profile_save_failed",
+                  "Campaign progress could not be saved"
+                )
+
+              IO.puts(Jason.encode!(failed))
+              loop(server)
+          end
+        else
+          IO.puts(Jason.encode!(reply))
+          loop(next)
+        end
     end
   end
 
@@ -40,7 +71,8 @@ defmodule Engine.Protocol do
       {error(nil, nil, 0, "internal_error", "Unable to process request"), server}
   end
 
-  def new_server, do: %{runs: %{}, next_run: 1, responses: %{}}
+  def new_server(profile \\ Engine.Progression.new()),
+    do: %{runs: %{}, profile: profile, responses: %{}}
 
   defp handle(request, server) when is_map(request) do
     request_id = Map.get(request, "request_id")
@@ -109,12 +141,12 @@ defmodule Engine.Protocol do
     seed = payload["seed"]
 
     if mode && is_integer(seed) && seed >= 0 do
-      run_id = "run-#{server.next_run}"
-      state = Engine.new(mode, seed)
+      run_id = "run-#{server.profile.next_run}"
+      state = Engine.new(mode, seed, server.profile.tier)
 
       next = %{
         server
-        | next_run: server.next_run + 1,
+        | profile: %{server.profile | next_run: server.profile.next_run + 1},
           runs: Map.put(server.runs, run_id, %{state: state})
       }
 
@@ -146,8 +178,17 @@ defmodule Engine.Protocol do
          :ok <- require_seq(request["seq"], state.tick),
          {:ok, command, count} <- parse_command(payload["command"], state.mode),
          {:ok, updated, events} <- advance(state, command, count) do
-      next = put_in(server, [:runs, run_id, :state], updated)
-      {ok(request, run_id, updated.tick, %{snapshot: snapshot(run_id, updated, events)}), next}
+      {profile, points} =
+        if state.status == :active and updated.status != :active,
+          do: Engine.Progression.reward(server.profile, updated),
+          else: {server.profile, 0}
+
+      next = server |> put_in([:runs, run_id, :state], updated) |> Map.put(:profile, profile)
+
+      {ok(request, run_id, updated.tick, %{
+         snapshot: snapshot(run_id, updated, events),
+         research_points_earned: points
+       }), next}
     else
       {:error, code, message} ->
         current_seq =
@@ -157,6 +198,27 @@ defmodule Engine.Protocol do
           end
 
         {request_error(request, current_seq, code, message), server}
+    end
+  end
+
+  defp dispatch(%{"type" => "tech.status"} = request, server) do
+    {ok(request, nil, request["seq"], %{profile: Engine.Progression.status(server.profile)}),
+     server}
+  end
+
+  defp dispatch(%{"type" => "tech.unlock", "payload" => payload} = request, server) do
+    case Engine.Progression.unlock(server.profile, payload["id"]) do
+      {:ok, profile} ->
+        {ok(request, nil, request["seq"], %{profile: Engine.Progression.status(profile)}),
+         %{server | profile: profile}}
+
+      {:error, reason} ->
+        {request_error(
+           request,
+           request["seq"],
+           Atom.to_string(reason),
+           "Technology unlock rejected: #{reason}"
+         ), server}
     end
   end
 
