@@ -69,13 +69,41 @@ defmodule Engine.ProgressionTest do
     assert again == profile
   end
 
+  test "network unlock adds redundant space readings and one deadline alert per contact" do
+    assert {:error, :prerequisite_required} = Progression.unlock(Progression.new(), "network")
+    profile = %{Progression.new() | tier: 1, points: 3}
+    assert {:ok, upgraded} = Progression.unlock(profile, "network")
+    assert upgraded.tier == 2
+    assert upgraded.points == 0
+
+    commands = [:check, :launch] ++ List.duplicate(:wait, 20)
+    {:ok, network, events} = Engine.replay(:space, 42, commands, 2)
+    {:ok, filter, _} = Engine.replay(:space, 42, commands, 1)
+    assert network.altitude_m == filter.altitude_m
+    assert network.velocity_m_s == filter.velocity_m_s
+    assert is_integer(Engine.observe(network).secondary_altitude_m)
+    assert is_integer(Engine.observe(network).sensor_disagreement_m)
+    assert Enum.any?(events, &(&1.type == :sensor_disagreement))
+    assert Engine.replay(:space, 42, commands, 2) == {:ok, network, events}
+
+    {:ok, central, warnings} = Engine.replay(:central, 42, List.duplicate(:wait, 13), 2)
+    assert central.status == :active
+
+    assert Enum.map(Enum.filter(warnings, &(&1.type == :deadline_warning)), & &1.contact) ==
+             [:orion, :vega]
+
+    assert Engine.observe(central).network_monitoring
+    {:ok, _, baseline_events} = Engine.replay(:central, 42, List.duplicate(:wait, 13), 1)
+    refute Enum.any?(baseline_events, &(&1.type == :deadline_warning))
+  end
+
   test "campaign profile survives a store reload" do
     path = Path.join(System.tmp_dir!(), "tls-profile-#{System.unique_integer([:positive])}.json")
     previous = System.get_env("TLS_PROFILE_PATH")
     System.put_env("TLS_PROFILE_PATH", path)
 
     try do
-      profile = %{Progression.new() | points: 3, tier: 1, next_run: 5}
+      profile = %{Progression.new() | points: 3, tier: 2, next_run: 5}
       assert :ok = ProgressionStore.save(profile)
       assert {:ok, ^profile} = ProgressionStore.load()
     after

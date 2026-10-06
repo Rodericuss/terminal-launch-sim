@@ -23,7 +23,13 @@ defmodule Engine.Central do
   ]
 
   def new(base),
-    do: Map.merge(base, %{contacts: @contacts, available_teams: 2, signal_jitter_s: 0})
+    do:
+      Map.merge(base, %{
+        contacts: @contacts,
+        available_teams: 2,
+        signal_jitter_s: 0,
+        network_alerted_contacts: []
+      })
 
   def command(state, {:assign, id}) do
     cond do
@@ -93,6 +99,24 @@ defmodule Engine.Central do
     contacts = Enum.reverse(contacts)
     {next, sample} = Engine.random(state)
 
+    warnings =
+      if state.tech_level >= 2 do
+        for contact <- contacts,
+            contact.status == :open,
+            contact.deadline_s - state.time_s - 1 <= 5,
+            contact.id not in state.network_alerted_contacts do
+          %{
+            type: :deadline_warning,
+            contact: contact.id,
+            remaining_s: contact.deadline_s - state.time_s - 1
+          }
+        end
+      else
+        []
+      end
+
+    alerted = state.network_alerted_contacts ++ Enum.map(warnings, & &1.contact)
+
     status =
       if Enum.all?(contacts, &(&1.status != :open)) do
         if Enum.all?(contacts, &(&1.status == :resolved)), do: :success, else: :partial
@@ -105,8 +129,9 @@ defmodule Engine.Central do
        | contacts: contacts,
          available_teams: state.available_teams + freed,
          status: status,
-         signal_jitter_s: if(state.tech_level >= 1, do: 0, else: floor(sample * 3) - 1)
-     }, events}
+         signal_jitter_s: if(state.tech_level >= 1, do: 0, else: floor(sample * 3) - 1),
+         network_alerted_contacts: alerted
+     }, events ++ warnings}
   end
 
   def observe(state) do
@@ -118,6 +143,7 @@ defmodule Engine.Central do
       available_teams: state.available_teams,
       deadline_uncertainty_s: if(state.tech_level >= 1, do: 0, else: 1),
       tech_level: state.tech_level,
+      network_monitoring: state.tech_level >= 2,
       contacts:
         Enum.map(state.contacts, fn contact ->
           contact

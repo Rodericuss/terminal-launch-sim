@@ -20,6 +20,10 @@ defmodule Engine.Space do
       peak_altitude_m: 0.0,
       observed_altitude_m: 0,
       observed_velocity_m_s: 0,
+      primary_altitude_m: 0,
+      secondary_altitude_m: 0,
+      sensor_disagreement_m: 0,
+      last_sensor_alert_s: -10,
       check_complete: false
     })
   end
@@ -52,17 +56,34 @@ defmodule Engine.Space do
     fuel = state.fuel_kg - used
     phase = if fuel <= 0 and state.phase == :powered, do: :coast, else: state.phase
     {noisy, sample} = Engine.random(state)
-    observed = round(altitude + (sample * 2.0 - 1.0) * uncertainty(state))
+    primary = max(0, round(altitude + (sample * 2.0 - 1.0) * uncertainty(state)))
+
+    {measured, observed, secondary, disagreement, sensor_events, last_alert} =
+      if state.tech_level >= 2 do
+        {twice_noisy, second_sample} = Engine.random(noisy)
+        secondary = max(0, round(altitude + (second_sample * 2.0 - 1.0) * 3))
+        difference = abs(primary - secondary)
+        alert = difference >= 4 and state.time_s + 1 - state.last_sensor_alert_s >= 10
+        events = if alert, do: [%{type: :sensor_disagreement, difference_m: difference}], else: []
+        last_alert = if alert, do: state.time_s + 1, else: state.last_sensor_alert_s
+        {twice_noisy, round((primary + secondary) / 2), secondary, difference, events, last_alert}
+      else
+        {noisy, primary, 0, 0, [], state.last_sensor_alert_s}
+      end
 
     next = %{
-      noisy
+      measured
       | phase: phase,
         altitude_m: altitude,
         velocity_m_s: velocity,
         fuel_kg: fuel,
         peak_altitude_m: peak,
-        observed_altitude_m: max(0, observed),
-        observed_velocity_m_s: round(velocity)
+        observed_altitude_m: observed,
+        observed_velocity_m_s: round(velocity),
+        primary_altitude_m: primary,
+        secondary_altitude_m: secondary,
+        sensor_disagreement_m: disagreement,
+        last_sensor_alert_s: last_alert
     }
 
     cond do
@@ -70,18 +91,18 @@ defmodule Engine.Space do
         result = if peak >= @target_altitude, do: :success, else: :partial
 
         {%{next | phase: :landed, status: result},
-         [%{type: :landed, result: result, peak_altitude_m: peak}]}
+         sensor_events ++ [%{type: :landed, result: result, peak_altitude_m: peak}]}
 
       phase == :coast and state.phase == :powered ->
-        {next, [%{type: :burnout}]}
+        {next, sensor_events ++ [%{type: :burnout}]}
 
       true ->
-        {next, []}
+        {next, sensor_events}
     end
   end
 
   def observe(state) do
-    %{
+    observation = %{
       mode: :space,
       model_version: state.model_version,
       time_s: state.time_s,
@@ -96,8 +117,18 @@ defmodule Engine.Space do
       target_altitude_m: @target_altitude,
       check_complete: state.check_complete
     }
+
+    if state.tech_level >= 2 do
+      Map.merge(observation, %{
+        primary_altitude_m: state.primary_altitude_m,
+        secondary_altitude_m: state.secondary_altitude_m,
+        sensor_disagreement_m: state.sensor_disagreement_m
+      })
+    else
+      observation
+    end
   end
 
-  defp uncertainty(%{tech_level: 1}), do: 3
+  defp uncertainty(%{tech_level: level}) when level >= 1, do: 3
   defp uncertainty(_), do: 5
 end

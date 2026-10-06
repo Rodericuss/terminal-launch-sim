@@ -19,7 +19,7 @@ Pedido:
 Resposta:
 
 ```json
-{"protocol_version":1,"request_id":"req-1","run_id":"run-1","seq":0,"type":"response","payload":{"ok":true,"data":{"snapshot":{"run_id":"run-1","seq":0,"observation":{"mode":"space","model_version":"0.2.0","tech_level":0,"time_s":0,"status":"active","phase":"ready","altitude_m":0,"velocity_m_s":0,"fuel_kg":100.0,"peak_altitude_m":0,"altitude_uncertainty_m":5,"target_altitude_m":2000.0,"check_complete":false},"events":[]}}}}
+{"protocol_version":1,"request_id":"req-1","run_id":"run-1","seq":0,"type":"response","payload":{"ok":true,"data":{"snapshot":{"run_id":"run-1","seq":0,"observation":{"mode":"space","model_version":"0.3.0","tech_level":0,"time_s":0,"status":"active","phase":"ready","altitude_m":0,"velocity_m_s":0,"fuel_kg":100.0,"peak_altitude_m":0,"altitude_uncertainty_m":5,"target_altitude_m":2000.0,"check_complete":false},"events":[]}}}}
 ```
 
 Erro:
@@ -40,7 +40,7 @@ Erro:
 | `run.snapshot` | `{}` | `snapshot` atual, com `events:[]` |
 | `calculator.evaluate` | `{"model":"average_speed","inputs":{"distance_m":100,"time_s":20}}` | `result` com valor, unidade, versão e explicação |
 | `tech.status` | `{}` | `profile` com pontos, nível e próximo desbloqueio |
-| `tech.unlock` | `{"id":"filter"}` | `profile` atualizado ou erro por pontos insuficientes |
+| `tech.unlock` | `{"id":"filter"}` ou `{"id":"network"}` | `profile` atualizado ou erro por pontos/pré-requisito |
 
 Comandos espaciais: `check`, `launch`, `abort`, `wait`, `wait N` (1 a 500). Comandos da central: `assign orion`, `assign vega`, `recall orion`, `recall vega`, `wait`, `wait N`. `wait N` executa até N passos de um segundo e para quando a partida termina.
 
@@ -48,4 +48,4 @@ Calculadora: `average_speed` usa `distance_m` e `time_s`; `work_eta` usa `remain
 
 O snapshot contém apenas `Engine.observe/1`, sem semente, estado aleatório ou valores verdadeiros internos. `events` contém os eventos produzidos por aquele comando. `run.create` e `run.snapshot` devolvem `events:[]`.
 
-Ao fechar uma missão, `run.command` devolve `research_points_earned` (0, 1 ou 2). O mesmo par modo/semente pontua uma única vez no perfil. A bancada de filtragem custa dois pontos e afeta somente partidas criadas após `tech.unlock`: altitude espacial ±3 m em vez de ±5 m e prazo estimado da central com jitter zero em vez de ±1 s. Os demais níveis da árvore ainda não estão implementados.
+Ao fechar uma missão, `run.command` devolve `research_points_earned` (0, 1 ou 2). O mesmo par modo/semente pontua uma única vez no perfil. A bancada de filtragem custa dois pontos e afeta somente partidas criadas após `tech.unlock`: altitude espacial ±3 m em vez de ±5 m e prazo estimado da central com jitter zero em vez de ±1 s. A rede de sensores custa três pontos após a bancada: adiciona dois canais de altitude e alerta de divergência no voo; na central, alerta uma vez por contato aberto ao se aproximar do prazo. IA e supercomputação ainda não estão implementadas.

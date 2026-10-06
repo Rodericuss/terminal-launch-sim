@@ -11,8 +11,10 @@ cargo run
 
 Na abertura, pressione `1` para o programa espacial ou `2` para a central fictícia. Digite comandos na linha inferior e pressione Enter. `F1` abre ajuda, `F2` troca entre âmbar, verde e sem cor, `Tab` ou `F3` alterna os painéis em terminais pequenos e `Ctrl+C` sai. A interface não usa animação. `Esc` limpa a entrada. Os comandos `space` e `central` iniciam novos exercícios.
 
+O tamanho das letras depende do emulador de terminal. Para abrir em uma janela Kitty com fonte um pouco menor, a partir da raiz do repositório: `kitty -o font_size=11 --directory frontend cargo run`. O jogo não altera a configuração global do terminal.
+
 Comandos do programa espacial: `check`, `launch`, `abort`, `wait N`. Comandos da central: `assign orion`, `assign vega`, `recall orion`, `recall vega`, `wait N`. `N` vai de 1 a 500. `snapshot` sincroniza os instrumentos. A calculadora usa `calc speed DISTÂNCIA_M TEMPO_S` ou `calc eta TRABALHO_RESTANTE EQUIPES`.
 
-`tech` mostra pontos de pesquisa e a árvore inicial. Uma conclusão inédita para a combinação de modo e semente concede dois pontos em caso de sucesso ou um em caso de conclusão parcial. `research filter` compra a primeira melhoria por dois pontos; ela afeta as próximas missões. Use `space 43` ou `central 43` para iniciar outra semente. O perfil é salvo localmente em `~/.local/share/terminal-launch-sim/profile.json`, respeitando `XDG_DATA_HOME` e `TLS_PROFILE_PATH`.
+`tech` mostra pontos de pesquisa e a árvore inicial. Uma conclusão inédita para a combinação de modo e semente concede dois pontos em caso de sucesso ou um em caso de conclusão parcial. `research filter` compra a bancada por dois pontos; `research network` compra a rede por três pontos após a bancada. Elas afetam as próximas missões. Use `space 43` ou `central 43` para iniciar outra semente. O perfil é salvo localmente em `~/.local/share/terminal-launch-sim/profile.json`, respeitando `XDG_DATA_HOME` e `TLS_PROFILE_PATH`.
 
 A TUI usa o contrato em [`../protocol/README.md`](../protocol/README.md). A simulação atual é um protótipo: salva o perfil de pesquisa, mas não salva nem retoma partidas ao fechar o cliente.

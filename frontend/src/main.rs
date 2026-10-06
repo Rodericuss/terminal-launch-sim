@@ -173,15 +173,15 @@ impl App {
         }
     }
 
-    fn unlock_filter(&mut self) {
+    fn unlock_technology(&mut self, id: &str) {
         match self
             .engine
-            .request("tech.unlock", None, 0, json!({"id": "filter"}))
+            .request("tech.unlock", None, 0, json!({"id": id}))
         {
             Ok(data) => {
                 self.profile = Some(data["profile"].clone());
                 self.panel = Panel::Research;
-                self.status = "Bancada desbloqueada; efeito nas próximas missões".into();
+                self.status = format!("Tecnologia {id} desbloqueada; ativa nas próximas missões");
             }
             Err(e) => self.status = e,
         }
@@ -210,7 +210,11 @@ impl App {
             return;
         }
         if command == "research filter" || command == "pesquisar filtro" {
-            self.unlock_filter();
+            self.unlock_technology("filter");
+            return;
+        }
+        if command == "research network" || command == "pesquisar rede" {
+            self.unlock_technology("network");
             return;
         }
         let parts: Vec<&str> = command.split_whitespace().collect();
@@ -376,10 +380,17 @@ fn format_number(value: &Value) -> String {
 fn format_event(event: &Value) -> String {
     let time = event["time_s"].as_u64().unwrap_or(0);
     let kind = event["type"].as_str().unwrap_or("evento");
-    let detail = event["contact"]
+    let mut detail = event["contact"]
         .as_str()
         .or_else(|| event["result"].as_str())
-        .unwrap_or("");
+        .unwrap_or("")
+        .to_string();
+    if let Some(metres) = event["difference_m"].as_u64() {
+        detail = format!("{metres} m");
+    }
+    if let Some(seconds) = event["remaining_s"].as_u64() {
+        detail = format!("{detail} · {seconds} s restantes");
+    }
     format!(
         "t={time:>3}  {} {}",
         kind.replace('_', " ").to_uppercase(),
@@ -419,11 +430,17 @@ fn telemetry_lines(o: &Value) -> Vec<String> {
             field(o, "target_altitude_m", "META", "m"),
             field(o, "check_complete", "CHECAGEM", ""),
         ]);
+        if o["sensor_disagreement_m"].is_number() {
+            lines.push(field(o, "sensor_disagreement_m", "DIVERGÊNCIA", "m"));
+        }
     } else {
         lines.extend([
             field(o, "available_teams", "EQUIPES LIVRES", ""),
             field(o, "deadline_uncertainty_s", "INCERTEZA ±", "s"),
         ]);
+        if o["network_monitoring"] == true {
+            lines.push("MALHA DE SENSORES      ATIVA".into());
+        }
         if let Some(contacts) = o["contacts"].as_array() {
             for c in contacts {
                 lines.push(String::new());
@@ -447,28 +464,47 @@ fn telemetry_lines(o: &Value) -> Vec<String> {
 
 fn mission_lines(o: &Value) -> Vec<String> {
     if o["mode"] == "space" {
-        vec![
-            "             ┌────┐".into(),
-            r"             │ /\ │".into(),
-            "             │ || │   FOGUETE DE PESQUISA".into(),
-            "             │ || │".into(),
-            "           ──┴────┴──".into(),
+        let phase = o["phase"].as_str().unwrap_or("?");
+        let plume = if phase == "powered" {
+            "          /\\/\\       EXAUSTÃO"
+        } else if phase == "ready" {
+            "         ======      BASE"
+        } else {
+            "           ||        MOTOR INATIVO"
+        };
+        let mut lines = vec![
+            "            /\\".into(),
+            "           /  \\".into(),
+            "          /____\\      CARGA DE PESQUISA".into(),
+            "          | <> |".into(),
+            "          |----|      SEPARAÇÃO".into(),
+            "          | || |      TANQUE".into(),
+            "         /|____|\\".into(),
+            "        /_/ || \\_\\    ALETAS".into(),
+            plume.into(),
             format!(
-                "ALT {} m  ·  VEL {} m/s",
+                "ALT {} m · VEL {} m/s · FASE {phase}",
                 format_number(&o["altitude_m"]),
                 format_number(&o["velocity_m_s"])
             ),
-            format!(
-                "META {} m  ·  FASE {}",
+        ];
+        if o["secondary_altitude_m"].is_number() {
+            lines.push(format!(
+                "A {} m · B {} m · diferença {} m · META {} m",
+                format_number(&o["primary_altitude_m"]),
+                format_number(&o["secondary_altitude_m"]),
+                format_number(&o["sensor_disagreement_m"]),
+                format_number(&o["target_altitude_m"])
+            ));
+        } else {
+            lines.push(format!(
+                "META {} m · ALTITUDE ±{} m · tecnologia nível {}",
                 format_number(&o["target_altitude_m"]),
-                o["phase"].as_str().unwrap_or("?")
-            ),
-            format!(
-                "OBSERVAÇÃO: altitude ±{} m; tecnologia nível {}",
                 format_number(&o["altitude_uncertainty_m"]),
                 format_number(&o["tech_level"])
-            ),
-        ]
+            ));
+        }
+        lines
     } else {
         let mut lines = vec![
             "       QUADRO DE SINAIS".into(),
@@ -497,6 +533,9 @@ fn mission_lines(o: &Value) -> Vec<String> {
                 format_number(&o["tech_level"])
             ),
         ]);
+        if o["network_monitoring"] == true {
+            lines.push("REDE ATIVA: alerta automático perto do prazo".into());
+        }
         lines
     }
 }
@@ -505,28 +544,39 @@ fn research_lines(profile: Option<&Value>) -> Vec<String> {
     let Some(profile) = profile else {
         return vec!["Perfil de pesquisa indisponível".into()];
     };
-    let unlocked = profile["next_unlock"]["unlocked"] == true;
-    vec![
+    let filter = profile["filter_unlocked"] == true;
+    let network = profile["network_unlocked"] == true;
+    let mut lines = vec![
         "      LABORATÓRIO DE COMPUTAÇÃO".into(),
         String::new(),
         format!("PONTOS DISPONÍVEIS: {}", format_number(&profile["points"])),
         format!("NÍVEL TECNOLÓGICO: {}", format_number(&profile["tier"])),
         String::new(),
         format!(
-            "[{}] BANCADA DE FILTRAGEM · custo {} ponto(s)",
-            if unlocked { "X" } else { " " },
-            format_number(&profile["next_unlock"]["cost"])
+            "[{}] BANCADA DE FILTRAGEM · altitude e prazo mais precisos",
+            if filter { "X" } else { " " }
         ),
-        "Efeito: altitude ±5 m → ±3 m; prazo ±1 s → 0 s".into(),
-        if unlocked {
-            "Ativa nas novas missões".into()
-        } else {
-            "Desbloqueie com: research filter".into()
-        },
+        format!(
+            "[{}] REDE DE SENSORES · dois canais e avisos de prazo",
+            if network { "X" } else { " " }
+        ),
         String::new(),
-        "PRÓXIMAS ETAPAS: rede de sensores, IA e supercomputação".into(),
-        "Essas etapas ainda estão em desenvolvimento.".into(),
-    ]
+    ];
+    if profile["next_unlock"].is_object() {
+        lines.push(format!(
+            "PRÓXIMO: {} · {} ponto(s)",
+            profile["next_unlock"]["title"].as_str().unwrap_or("?"),
+            format_number(&profile["next_unlock"]["cost"])
+        ));
+        lines.push(format!(
+            "Comando: research {}",
+            profile["next_unlock"]["id"].as_str().unwrap_or("?")
+        ));
+    } else {
+        lines.push("PRÓXIMAS ETAPAS: IA e supercomputação em desenvolvimento".into());
+    }
+    lines.push("Desbloqueios afetam somente novas missões.".into());
+    lines
 }
 
 fn render_lines(
@@ -712,6 +762,7 @@ fn draw(frame: &mut ratatui::Frame, app: &App) {
             "  snapshot: sincroniza instrumentos".into(),
             "  tech: pesquisa e pontos disponíveis".into(),
             "  research filter: compra a bancada".into(),
+            "  research network: compra a rede de sensores".into(),
             "  calc speed DISTÂNCIA_M TEMPO_S".into(),
             "  calc eta TRABALHO_RESTANTE EQUIPES".into(),
             "".into(),

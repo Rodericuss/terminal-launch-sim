@@ -61,7 +61,7 @@ def capture(mode, commands, destination):
         os.write(master, mode.encode())
         drain(master, stream, 0.6)
         for command in commands:
-            os.write(master, command.encode() + b"\r")
+            os.write(master, b"\t" if command == "<TAB>" else command.encode() + b"\r")
             drain(master, stream, 0.5)
         draw(screen, destination)
     finally:
@@ -79,9 +79,9 @@ def draw(screen, destination):
     font_path = subprocess.check_output(
         ["fc-match", "-f", "%{file}", "DejaVu Sans Mono"], text=True
     ).strip()
-    font = ImageFont.truetype(font_path, 18)
+    font = ImageFont.truetype(font_path, 16)
     cell_width = round(font.getlength("M"))
-    cell_height = 26
+    cell_height = 23
     pad = 24
     background = (15, 20, 18)
     image = Image.new(
@@ -122,4 +122,13 @@ if __name__ == "__main__":
     capture("2", ["assign orion", "assign vega", "wait 3"], OUT / "central.png")
     capture("2", ["assign orion", "assign vega", "wait 10", "research filter", "central 43", "tech"],
             OUT / "research.png")
-    print("Captured space.png, central.png and research.png")
+    network_setup = [
+        "assign orion", "assign vega", "wait 10", "research filter",
+        "central 43", "assign orion", "assign vega", "wait 10",
+        "central 44", "assign orion", "assign vega", "wait 10",
+        "research network",
+    ]
+    capture("2", network_setup + ["central 45", "wait 13", "tech"], OUT / "network.png")
+    capture("2", network_setup + ["space 46", "<TAB>", "check", "launch", "wait 30"],
+            OUT / "space_network.png")
+    print("Captured five screenshots in docs/screenshots/")

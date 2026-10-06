@@ -1,14 +1,14 @@
 defmodule Engine do
   @moduledoc "Pure deterministic engine for introductory missions."
 
-  @version "0.2.0"
+  @version "0.3.0"
   def model_version, do: @version
 
   def new(mode, seed, tech_level \\ 0)
 
   def new(mode, seed, tech_level)
       when mode in [:space, :central] and is_integer(seed) and seed >= 0 and
-             tech_level in [0, 1] do
+             tech_level in [0, 1, 2] do
     base = %{
       mode: mode,
       model_version: @version,
