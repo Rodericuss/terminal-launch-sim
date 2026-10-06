@@ -28,7 +28,7 @@ Os dois modos compartilham relógio, eventos, unidades, calculadora, telemetria,
 
 ## 3. Experiência e estética
 
-Referência visual principal: **computadores e centros de comando da Guerra Fria**. Influência secundária: interfaces de terminal vistas em *Matrix*. O período histórico não precisa ser reconstituído literalmente; cenário, equipamentos e nomenclatura do jogo são ficcionais. Evitar a aparência de interface moderna com um filtro verde por cima.
+Referência visual principal: **computadores e centros de comando da Guerra Fria**, avançando para estações de trabalho e redes inspiradas nos anos 1990. Influência secundária: interfaces de terminal vistas em *Matrix*. O período histórico não precisa ser reconstituído literalmente; cenário, equipamentos e nomenclatura do jogo são ficcionais. Evitar a aparência de interface moderna com um filtro verde por cima.
 
 Layout inicial em terminal largo:
 
@@ -70,6 +70,14 @@ No mínimo uma campanha curta com treinamento, exercício com múltiplos eventos
 ### 4.4 Conteúdo e progressão
 
 Tutoriais interativos por conceito, glossário, ajuda contextual, objetivos claros, avaliação pós missão e histórico de decisões. Cada missão tem critérios de sucesso, falha e conclusão parcial. Dificuldade altera assistência e visibilidade, sem trocar silenciosamente as leis do modelo. Incluir modo de prática com pausa livre e modo de avaliação com regras específicas.
+
+### 4.5 Pesquisa computacional retrofuturista
+
+A campanha começa com computação e comunicações inspiradas nos anos 1990 e evolui, em uma linha histórica **fictícia**, até redes de sensores, sistemas de apoio à decisão e supercomputadores que excedem a capacidade real daquela década. A discrepância é uma regra explícita do universo do jogo, não uma alegação histórica. Ideias precursoras de IA, computação distribuída, sensores conectados e simulação numérica dão identidade à árvore de pesquisa.
+
+O jogador obtém dados e pontos de pesquisa ao concluir medições, validar previsões e analisar relatórios. Esses recursos desbloqueiam infraestrutura em etapas; cada etapa exige capacidade de processamento, energia e manutenção. Missões posteriores usam a infraestrutura nas duas campanhas. Melhorias afetam qualidade e latência de **observações e previsões**, quantidade de análises simultâneas e ferramentas disponíveis. Não alteram silenciosamente as leis físicas nem garantem sucesso automático. A interface mostra custo, hipótese, benefício mensurável e limite de cada tecnologia, além de comparar a leitura antes e depois da melhoria.
+
+A árvore e o ciclo inicial estão detalhados em [docs/PROGRESSION.md](docs/PROGRESSION.md). Para a V1, a progressão deve persistir entre missões, ser reproduzível no replay e oferecer ao menos uma decisão de investimento com efeito verificável em cada modo. A capacidade de supercomputação é um objetivo tardio da campanha, obtido por trabalho acumulado e acompanhado de custos operacionais.
 
 ## 5. Arquitetura recomendada
 
@@ -160,6 +168,7 @@ Cada etapa termina com código, documentação e demonstração verificável. Pr
 
 - Pelo menos uma campanha completa em **cada modo**, com início, progressão, conclusão e relatório; tutoriais suficientes para jogar sem documentação externa.
 - Calculadora e modelos versionados presentes nos dois modos; entradas, unidades, hipóteses e saídas consultáveis no jogo. Cálculos mudam decisões e resultados.
+- Pesquisa computacional persistente progride de instrumentos básicos a supercomputação fictícia; desbloqueios têm custo e efeito mensurável em missões de ambos os modos.
 - Testes de referência independentes cobrem casos típicos, limites e entradas inválidas; tolerâncias definidas por grandeza. Nenhuma grandeza exibida sem unidade ou indicação de que é estimativa.
 - Replay reproduz resultado, sequência de eventos e leituras observáveis com mesma semente/modelo; saves retomam sem perda de comandos confirmados.
 - Interface opera inteiramente por teclado, suporta tela pequena, paleta sem cor e leitura textual dos gráficos; não depende de 3D.
